@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>無限 トリビア クイズ</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+body { background: linear-gradient(135deg, #1a1a2e 0%, #0d1b2a 100%); min-height:100vh; }
+.option-btn { transition: all 0.2s; }
+.option-btn:hover:not(:disabled) { transform: translateX(6px); }
+.option-btn.correct { background: #166534 !important; border-color: #4ade80 !important; }
+.option-btn.wrong { background: #7f1d1d !important; border-color: #f87171 !important; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);} }
+.fade-in { animation: fadeIn 0.4s ease-out; }
+.progress-bar { transition: width 0.4s ease; }
+</style>
+</head>
+<body class="text-white font-sans p-4">
+<div class="max-w-xl mx-auto">
+  <h1 class="text-3xl font-bold text-center mb-1 text-yellow-400">🧠 無限トリビア クイズ</h1>
+  <p class="text-center text-gray-400 text-sm mb-4">全100問・ランダム出題</p>
+
+  <!-- Stats -->
+  <div class="bg-gray-800 bg-opacity-80 rounded-xl p-3 mb-4 grid grid-cols-4 gap-2 text-center text-sm">
+    <div><div class="text-green-400 font-bold text-lg" id="statCorrect">0</div><div class="text-gray-400">正解</div></div>
+    <div><div class="text-red-400 font-bold text-lg" id="statWrong">0</div><div class="text-gray-400">不正解</div></div>
+    <div><div class="text-yellow-400 font-bold text-lg" id="statRate">0%</div><div class="text-gray-400">正解率</div></div>
+    <div><div class="text-blue-400 font-bold text-lg" id="statStreak">0</div><div class="text-gray-400">連続正解</div></div>
+  </div>
+
+  <!-- Genre Select -->
+  <div class="flex flex-wrap gap-2 mb-4 justify-center">
+    <button onclick="setGenre('all')" id="gAll" class="px-4 py-2 rounded-xl font-bold text-sm border-2 border-yellow-400 text-yellow-400 bg-yellow-400 bg-opacity-10" aria-label="全ジャンル">🌐 全て</button>
+    <button onclick="setGenre('science')" id="gScience" class="px-4 py-2 rounded-xl font-bold text-sm border-2 border-blue-400 text-blue-400 bg-blue-400 bg-opacity-10" aria-label="科学">🔬 科学</button>
+    <button onclick="setGenre('history')" id="gHistory" class="px-4 py-2 rounded-xl font-bold text-sm border-2 border-orange-400 text-orange-400 bg-orange-400 bg-opacity-10" aria-label="歴史">📜 歴史</button>
+    <button onclick="setGenre('geo')" id="gGeo" class="px-4 py-2 rounded-xl font-bold text-sm border-2 border-green-400 text-green-400 bg-green-400 bg-opacity-10" aria-label="地理">🌏 地理</button>
+    <button onclick="setGenre('ent')" id="gEnt" class="px-4 py-2 rounded-xl font-bold text-sm border-2 border-pink-400 text-pink-400 bg-pink-400 bg-opacity-10" aria-label="エンタメ">🎭 エンタメ</button>
+  </div>
+
+  <!-- Progress -->
+  <div class="bg-gray-700 rounded-full h-2 mb-2">
+    <div id="progressBar" class="progress-bar bg-yellow-400 h-2 rounded-full" style="width:0%"></div>
+  </div>
+  <div class="text-xs text-gray-400 text-right mb-3" id="progressText">0 / 25 問</div>
+
+  <!-- Quiz Card -->
+  <div id="quizCard" class="bg-gray-800 bg-opacity-80 rounded-2xl p-6 mb-4 fade-in">
+    <div class="flex items-center gap-2 mb-3">
+      <span id="genreTag" class="text-xs px-2 py-0.5 rounded-full bg-blue-900 text-blue-300 font-bold">科学</span>
+      <span class="text-xs text-gray-500" id="qNumber">Q.1</span>
+    </div>
+    <div id="question" class="text-lg font-bold mb-5 leading-relaxed">ジャンルを選んでクイズを始めましょう！</div>
+    <div id="options" class="space-y-3"></div>
+  </div>
+
+  <!-- Explanation -->
+  <div id="explanation" class="hidden bg-gray-900 rounded-xl p-3 mb-3 border border-gray-700">
+    <div class="text-xs text-gray-400 mb-1">解説</div>
+    <div id="explText" class="text-sm text-gray-200"></div>
+  </div>
+
+  <div class="flex justify-center">
+    <button id="btnNext" onclick="nextQuestion()" class="hidden bg-yellow-500 hover:bg-yellow-400 text-black font-bold px-8 py-3 rounded-xl" aria-label="次の問題">次の問題 →</button>
+  </div>
+</div>
+
+<script>
+const QUESTIONS = {
+  science: [
+    {q:"水の化学式はどれですか？",a:0,opts:["H₂O","CO₂","NaCl","O₂"],expl:"水は水素2原子と酸素1原子からなるH₂Oです。"},
+    {q:"光の速度は1秒間に約何kmですか？",a:1,opts:["30万km","300万km","30km","3万km"],expl:"光速は真空中で約299,792km/s、約30万km/sです。"},
+    {q:"DNA の正式名称はどれですか？",a:2,opts:["デオキシリボ核酸以外","デオキシリボ核酸のこと","デオキシリボ核酸","ジオキシリボ核酸"],expl:"DNA = デオキシリボ核酸（Deoxyribonucleic Acid）です。"},
+    {q:"元素記号「Fe」は何の元素ですか？",a:0,opts:["鉄","金","銀","銅"],expl:"Feはラテン語のFerrum（鉄）に由来します。"},
+    {q:"太陽系で最も大きな惑星は？",a:2,opts:["土星","天王星","木星","海王星"],expl:"木星は太陽系最大の惑星で、直径は地球の約11倍です。"},
+    {q:"人体で最も大きな臓器は？",a:1,opts:["心臓","皮膚","肺","肝臓"],expl:"皮膚は体表面積が約1.6m²あり、人体最大の臓器です。"},
+    {q:"光合成で植物が吸収するのは？",a:0,opts:["二酸化炭素","酸素","窒素","水素"],expl:"植物は光合成で二酸化炭素と水を取り込み、酸素と糖を生成します。"},
+    {q:"ニュートンの第一法則は何の法則？",a:3,opts:["作用反作用の法則","加速度の法則","万有引力の法則","慣性の法則"],expl:"第一法則は慣性の法則：外力がなければ物体は等速直線運動を続けます。"},
+    {q:"原子番号1番の元素は？",a:1,opts:["ヘリウム","水素","炭素","酸素"],expl:"水素（H）は原子番号1、最も軽い元素です。"},
+    {q:"血液の赤色は何によるものですか？",a:2,opts:["白血球","血小板","ヘモグロビン","血清"],expl:"赤血球中のヘモグロビンが鉄を含み、酸素と結合すると赤くなります。"},
+    {q:"音の速さは気温が上がると？",a:0,opts:["速くなる","遅くなる","変わらない","関係ない"],expl:"気温が高いほど空気分子の運動が活発になり、音速は上がります。"},
+    {q:"ビタミンCが豊富な食品は？",a:3,opts:["バター","卵","牛乳","レモン"],expl:"レモンはビタミンC（アスコルビン酸）が豊富で、100gあたり約50mg含みます。"},
+    {q:"地球の自転周期は約？",a:1,opts:["12時間","24時間","48時間","6時間"],expl:"地球は約23時間56分で1回自転します（恒星日）。"},
+    {q:"電流の単位は？",a:2,opts:["ボルト","ワット","アンペア","オーム"],expl:"電流の単位はアンペア（A）、電圧はボルト（V）です。"},
+    {q:"ヒトゲノムの染色体数は？（対）",a:0,opts:["23対","22対","24対","46対"],expl:"ヒトは23対46本の染色体を持ちます（通常の体細胞）。"},
+    {q:"半導体として最もよく使われる元素は？",a:3,opts:["炭素","ゲルマニウム","ヒ素","ケイ素"],expl:"シリコン（Si・ケイ素）はトランジスタや集積回路の主要材料です。"},
+    {q:"絶対零度は何℃ですか？",a:1,opts:["-100℃","-273.15℃","-200℃","-373℃"],expl:"絶対零度は−273.15℃（0K）で、熱力学的に到達できない温度下限です。"},
+    {q:"プリズムで白色光を分散すると何ができる？",a:2,opts:["影","暗闇","虹色のスペクトル","白い光"],expl:"白色光はプリズムで波長別に分散され、虹色（スペクトル）になります。"},
+    {q:"月が地球を一周する周期は約？",a:0,opts:["27.3日","30日","365日","7日"],expl:"月の公転周期は約27.3日（恒星月）、新月から新月は約29.5日（朔望月）です。"},
+    {q:"光合成の産物は何ですか？",a:2,opts:["水と二酸化炭素","窒素と炭素","酸素とグルコース","水素とメタン"],expl:"光合成：6CO₂+6H₂O→C₆H₁₂O₆（グルコース）+6O₂"},
+    {q:"元素記号「Au」は何の元素？",a:1,opts:["銀","金","アルミニウム","アルゴン"],expl:"Auはラテン語のAurum（金）に由来します。"},
+    {q:"地球の表面の約何%が海ですか？",a:2,opts:["50%","61%","71%","80%"],expl:"地球表面の約71%が海洋です。"},
+    {q:"人体の骨の総数は？（成人）",a:3,opts:["150本","180本","250本","206本"],expl:"成人の骨は約206本です（乳幼児は約270～300本）。"},
+    {q:"アインシュタインの有名な式は？",a:0,opts:["E=mc²","F=ma","E=hν","PV=nRT"],expl:"E=mc²は特殊相対性理論のエネルギーと質量の等価式です。"},
+    {q:"最も電気抵抗が低い状態を何という？",a:1,opts:["絶縁体","超伝導","半導体","誘電体"],expl:"超伝導は特定の低温で電気抵抗がゼロになる現象です。"},
+  ],
+  history: [
+    {q:"日本で最初の元号は何ですか？",a:0,opts:["大化","天智","推古","白雉"],expl:"大化は645年、大化の改新とともに制定された最初の元号です。"},
+    {q:"万里の長城を最初に建設した王朝は？",a:2,opts:["漢","唐","秦","明"],expl:"秦の始皇帝が北方遊牧民対策として長城を建設しました（前221年〜）。"},
+    {q:"フランス革命が始まった年は？",a:1,opts:["1776年","1789年","1804年","1815年"],expl:"バスティーユ牢獄襲撃（1789年7月14日）がフランス革命の始まりとされます。"},
+    {q:"源頼朝が鎌倉幕府を開いたのは何年？",a:3,opts:["1185年","1190年","1180年","1192年"],expl:"1192年に頼朝が征夷大将軍に就任し鎌倉幕府が確立しました。"},
+    {q:"ローマ帝国を滅ぼした民族は主に？",a:0,opts:["ゲルマン民族","フン族","スラブ族","モンゴル族"],expl:"476年、ゲルマン人傭兵隊長オドアケルが最後の西ローマ皇帝を退位させました。"},
+    {q:"江戸幕府を開いたのは誰ですか？",a:2,opts:["豊臣秀吉","織田信長","徳川家康","足利尊氏"],expl:"徳川家康は1603年に征夷大将軍となり江戸幕府を開きました。"},
+    {q:"ピラミッドを建設したのは何人ですか？",a:1,opts:["メソポタミア人","古代エジプト人","古代ローマ人","マヤ人"],expl:"ギザの大ピラミッドは古代エジプトのファラオのために建設されました。"},
+    {q:"第一次世界大戦が始まった年は？",a:0,opts:["1914年","1918年","1939年","1905年"],expl:"サラエボ事件（1914年6月）を契機に第一次世界大戦が勃発しました。"},
+    {q:"日本が明治維新を迎えたのは何年？",a:2,opts:["1853年","1858年","1868年","1873年"],expl:"1868年（明治元年）、明治天皇の新政府が樹立され明治維新が始まりました。"},
+    {q:"アメリカ独立宣言が採択されたのは？",a:3,opts:["1770年","1774年","1783年","1776年"],expl:"1776年7月4日にアメリカ独立宣言が採択され、現在も独立記念日として祝われます。"},
+    {q:"ナポレオンが皇帝に即位したのは何年？",a:1,opts:["1799年","1804年","1812年","1815年"],expl:"1804年12月、ナポレオン1世としてフランス皇帝に即位しました。"},
+    {q:"東西冷戦の終結を象徴するのは？",a:2,opts:["ベトナム戦争終結","スエズ危機","ベルリンの壁崩壊","キューバ危機"],expl:"1989年のベルリンの壁崩壊が東西冷戦終結の象徴とされます。"},
+    {q:"関ヶ原の戦いがあったのは何年？",a:0,opts:["1600年","1598年","1603年","1615年"],expl:"慶長5年（1600年）の関ヶ原の戦いで徳川家康が石田三成を破りました。"},
+    {q:"モンゴル帝国を建国したのは誰？",a:3,opts:["フビライ・ハン","オゴタイ・ハン","バトゥ","チンギス・ハン"],expl:"チンギス・ハン（テムジン）は1206年にモンゴル帝国を建国しました。"},
+    {q:"第二次世界大戦が終わった年は？",a:1,opts:["1944年","1945年","1946年","1943年"],expl:"1945年8月15日の終戦詔書放送でアジア太平洋戦争が終わりました。"},
+    {q:"コロンブスがアメリカ大陸に到達したのは？",a:2,opts:["1488年","1497年","1492年","1500年"],expl:"1492年10月12日、コロンブスが現在のバハマ諸島に到達しました。"},
+    {q:"アレクサンダー大王の出身国は？",a:0,opts:["マケドニア","ギリシャ","ペルシャ","エジプト"],expl:"アレクサンダー3世はマケドニア王国の王で、東方遠征で大帝国を築きました。"},
+    {q:"日清戦争が起きた年は？",a:3,opts:["1885年","1887年","1890年","1894年"],expl:"1894年の日清戦争は朝鮮の支配権をめぐる日本と清の戦争です。"},
+    {q:"最初に南極点に到達したのは誰？",a:1,opts:["スコット","アムンセン","シャクルトン","バード"],expl:"ロアール・アムンセン（ノルウェー）は1911年12月14日に南極点に到達しました。"},
+    {q:"ルネサンスが起きた国は最初どこ？",a:2,opts:["フランス","スペイン","イタリア","ドイツ"],expl:"14世紀のイタリア（フィレンツェ）でルネサンス（文芸復興）が始まりました。"},
+    {q:"聖徳太子が制定した冠位十二階は何年？",a:0,opts:["603年","604年","607年","600年"],expl:"603年に聖徳太子は冠位十二階を制定し、能力主義的な人材登用制度を作りました。"},
+    {q:"ビスマルクが統一したのはどの国？",a:3,opts:["イタリア","オーストリア","フランス","ドイツ"],expl:"プロイセン宰相ビスマルクは1871年にドイツ統一を実現しました。"},
+    {q:"ロシア革命が起きた年は？",a:1,opts:["1905年","1917年","1921年","1914年"],expl:"1917年2月（三月）革命と10月（11月）革命でボルシェビキが権力を握りました。"},
+    {q:"大和朝廷の成立は何世紀頃？",a:2,opts:["2世紀","3世紀","4世紀","5世紀"],expl:"4世紀頃に大和政権が成立し、徐々に日本列島を統一しました。"},
+    {q:"チャールズ・ダーウィンの著作「種の起源」が出版されたのは？",a:0,opts:["1859年","1865年","1871年","1880年"],expl:"「種の起源」は1859年11月に出版され、自然選択説を提唱しました。"},
+  ],
+  geo: [
+    {q:"世界で最も長い川は？",a:2,opts:["アマゾン川","ミシシッピ川","ナイル川","長江"],expl:"ナイル川（全長約6,650km）は世界最長の川とされています（議論あり）。"},
+    {q:"日本で最も高い山は？",a:0,opts:["富士山","北岳","奥穂高岳","槍ヶ岳"],expl:"富士山（3,776m）は日本最高峰です。"},
+    {q:"世界で最も面積が大きい国は？",a:1,opts:["カナダ","ロシア","アメリカ","中国"],expl:"ロシアは面積約1,710万km²で世界最大の国です。"},
+    {q:"エッフェル塔がある都市は？",a:3,opts:["ロンドン","ベルリン","ローマ","パリ"],expl:"エッフェル塔は1889年のパリ万博のために建設されました。"},
+    {q:"アフリカ大陸で最も高い山は？",a:2,opts:["ケニア山","エルゴン山","キリマンジャロ","ドラケンスバーグ"],expl:"キリマンジャロ（5,895m）はタンザニアにある最高峰です。"},
+    {q:"地中海に面していない国はどれ？",a:1,opts:["スペイン","ポルトガル","イタリア","ギリシャ"],expl:"ポルトガルは大西洋に面しており、地中海には面していません。"},
+    {q:"日本の最東端の島は？",a:3,opts:["小笠原諸島","沖縄島","択捉島","南鳥島"],expl:"南鳥島（東経153°59'）が日本最東端の島です。"},
+    {q:"世界で最も深い湖は？",a:0,opts:["バイカル湖","カスピ海","タンガニーカ湖","スーペリア湖"],expl:"バイカル湖（最深部1,642m）は世界最深かつ最大の淡水湖です。"},
+    {q:"オーストラリアの首都は？",a:2,opts:["シドニー","メルボルン","キャンベラ","ブリスベン"],expl:"キャンベラは1927年にオーストラリアの首都となりました。"},
+    {q:"アマゾン熱帯雨林が広がる国は主に？",a:1,opts:["コロンビア","ブラジル","ペルー","ボリビア"],expl:"アマゾン熱帯雨林の約60%がブラジルに位置します。"},
+    {q:"世界最大の砂漠は？",a:3,opts:["ゴビ砂漠","アラビア砂漠","カラハリ砂漠","サハラ砂漠"],expl:"サハラ砂漠（約920万km²）は世界最大の熱帯砂漠です（南極を除く）。"},
+    {q:"マラッカ海峡はどの2つの海域をつなぐ？",a:0,opts:["インド洋と太平洋","インド洋と大西洋","太平洋と大西洋","黒海と地中海"],expl:"マラッカ海峡はインド洋とアンダマン海（太平洋方面）をつなぐ重要な航路です。"},
+    {q:"スエズ運河が通る国は？",a:2,opts:["イスラエル","サウジアラビア","エジプト","ヨルダン"],expl:"スエズ運河はエジプトにあり、地中海と紅海をつなぎます（1869年開通）。"},
+    {q:"北欧5か国に含まれない国は？",a:1,opts:["スウェーデン","ドイツ","フィンランド","デンマーク"],expl:"北欧（Norden）はデンマーク・フィンランド・アイスランド・ノルウェー・スウェーデンです。"},
+    {q:"世界で最も人口が多い国は？",a:3,opts:["インド","アメリカ","インドネシア","中国"],expl:"2023年にインドが中国を抜き世界最多人口国となりました（約14億人）。"},
+    {q:"日本の四国に含まれない県は？",a:2,opts:["愛媛県","高知県","和歌山県","徳島県"],expl:"四国は愛媛・高知・徳島・香川の4県です。和歌山は近畿地方です。"},
+    {q:"ライン川が流れていない国は？",a:0,opts:["フランス","スイス","ドイツ","オランダ"],expl:"ライン川はスイス・リヒテンシュタイン・オーストリア・ドイツ・フランス・オランダを流れます。（※フランスも流れる）"},
+    {q:"ヒマラヤ山脈がない国は？",a:3,opts:["ネパール","インド","ブータン","ミャンマー"],expl:"ヒマラヤ山脈はネパール・インド・ブータン・中国・パキスタンにまたがります。"},
+    {q:"コパカバーナビーチがある都市は？",a:1,opts:["サンパウロ","リオデジャネイロ","ブエノスアイレス","モンテビデオ"],expl:"コパカバーナはリオデジャネイロの南大西洋に面した有名なビーチです。"},
+    {q:"アラスカを購入した国は？",a:2,opts:["イギリス","フランス","アメリカ","カナダ"],expl:"アメリカは1867年にロシアからアラスカを720万ドルで購入しました。"},
+    {q:"世界最小の国は？",a:0,opts:["バチカン","モナコ","サンマリノ","リヒテンシュタイン"],expl:"バチカン市国（面積約0.44km²）は世界最小の独立国家です。"},
+    {q:"琵琶湖がある都道府県は？",a:3,opts:["三重県","京都府","奈良県","滋賀県"],expl:"琵琶湖は滋賀県に位置し、日本最大の湖（面積670km²）です。"},
+    {q:"カスピ海は何？",a:1,opts:["海","湖","湾","内海"],expl:"カスピ海は塩水の内陸湖（世界最大の湖）で、海ではありません。"},
+    {q:"デンマーク領のグリーンランドは地理的にはどこ？",a:2,opts:["ヨーロッパ","北極","北アメリカ","南極"],expl:"グリーンランドは北アメリカプレート上にあり、地理的には北アメリカに属します。"},
+    {q:"ポンペイ遺跡を埋めた火山は？",a:0,opts:["ヴェスヴィオ火山","エトナ火山","ストロンボリ","ヴルカーノ"],expl:"79年のヴェスヴィオ火山大噴火でポンペイは火山灰に埋もれました。"},
+  ],
+  ent: [
+    {q:"手塚治虫の代表作「鉄腕アトム」の主人公の名前は？",a:2,opts:["コバルト","ウラン","アトム","プルート"],expl:"鉄腕アトムの主人公の名前は「アトム」、天馬博士が亡き息子を模して作ったロボットです。"},
+    {q:"映画「タイタニック」（1997）の監督は？",a:0,opts:["ジェームズ・キャメロン","スティーヴン・スピルバーグ","リドリー・スコット","クリストファー・ノーラン"],expl:"ジェームズ・キャメロン監督の「タイタニック」はアカデミー賞11部門を受賞しました。"},
+    {q:"「千と千尋の神隠し」を制作したのは？",a:1,opts:["東映","スタジオジブリ","サンライズ","京都アニメーション"],expl:"「千と千尋の神隠し」（2001）はスタジオジブリ・宮崎駿監督作品です。"},
+    {q:"ビートルズの出身地は？",a:3,opts:["ロンドン","バーミンガム","マンチェスター","リバプール"],expl:"ビートルズはイングランド北西部のリバプール出身です。"},
+    {q:"「ハリー・ポッター」シリーズの著者は？",a:2,opts:["C.S.ルイス","J.R.R.トールキン","J.K.ローリング","ロアルド・ダール"],expl:"J.K.ローリングは1997年にハリー・ポッターシリーズ第1作を出版しました。"},
+    {q:"マリオの職業は何ですか？",a:0,opts:["配管工","大工","料理人","農家"],expl:"マリオは配管工（plumber）の設定です。元々はドンキーコングの「大工」でした。"},
+    {q:"「進撃の巨人」の作者は？",a:3,opts:["尾田栄一郎","岸本斉史","鳥山明","諫山創"],expl:"諫山創のデビュー作「進撃の巨人」は2009年から講談社で連載されました。"},
+    {q:"映画「インセプション」の監督は？",a:1,opts:["J.J.エイブラムス","クリストファー・ノーラン","デニス・ヴィルヌーヴ","デヴィッド・フィンチャー"],expl:"クリストファー・ノーラン監督の「インセプション」（2010）は夢の中への潜入を描きます。"},
+    {q:"テトリスを発明したのは誰ですか？",a:2,opts:["ビル・ゲイツ","宮本茂","アレクセイ・パジトノフ","坂口博信"],expl:"アレクセイ・パジトノフがソビエト連邦で1984年にテトリスを開発しました。"},
+    {q:"「ワンピース」の主人公の能力は？",a:0,opts:["ゴムゴムの実","メラメラの実","ヤミヤミの実","ニキュニキュの実"],expl:"ルフィはゴムゴムの実（実際はヒトヒトの実モデル大猿）の能力者です。"},
+    {q:"映画「マトリックス」（1999）の監督は？",a:3,opts:["マイケル・ベイ","ポール・バーホーベン","ロバート・ゼメキス","ウォシャウスキー姉妹"],expl:"ウォシャウスキー姉妹（当時は兄弟）が「マトリックス」を監督しました。"},
+    {q:"「ドラゴンボール」の作者は？",a:1,opts:["荒木飛呂彦","鳥山明","高橋和希","武内直子"],expl:"鳥山明は「ドラゴンボール」「Dr.スランプ」等の著者です。"},
+    {q:"「風の谷のナウシカ」の原作形態は？",a:2,opts:["ライトノベル","テレビアニメ","漫画","絵本"],expl:"ナウシカは1982年から1994年まで宮崎駿が「アニメージュ」に連載した漫画が原作です。"},
+    {q:"「スター・ウォーズ」エピソードIV「新たなる希望」が公開されたのは？",a:0,opts:["1977年","1983年","1980年","1975年"],expl:"スター・ウォーズ第1作（Ep.IV）は1977年5月に公開されました。"},
+    {q:"ポケモンの日本語正式名称は？",a:3,opts:["ポケットモンスターズ","ポケットモンスターコレクション","ポケットモンスターバトル","ポケットモンスター"],expl:"正式名称は「ポケットモンスター」、英語表記はPokémonです。"},
+    {q:"「エヴァンゲリオン」を制作した会社は？",a:1,opts:["東映アニメーション","GAINAX/カラー","スタジオジブリ","ufotable"],expl:"新世紀エヴァンゲリオンはGAINAX制作（現在はカラー）、監督は庵野秀明です。"},
+    {q:"テレビゲーム「ゼルダの伝説」の主人公の名前は？",a:2,opts:["ゼルダ","ガノン","リンク","ダルマニア"],expl:"ゼルダの伝説シリーズの主人公はリンク、ゼルダはヒロインの名前です。"},
+    {q:"映画「ジョーズ」の監督は？",a:0,opts:["スティーヴン・スピルバーグ","ジョン・カーペンター","リドリー・スコット","フランシス・コッポラ"],expl:"「ジョーズ」（1975）はスピルバーグ監督の出世作で、夏の海水浴客を脅かすサメの恐怖を描きます。"},
+    {q:"「鬼滅の刃」の作者は？",a:3,opts:["岸本斉史","尾田栄一郎","富樫義博","吾峠呼世晴"],expl:"吾峠呼世晴の「鬼滅の刃」は2016年から2020年まで週刊少年ジャンプに連載されました。"},
+    {q:"バービー人形を発売したおもちゃ会社は？",a:1,opts:["ハスブロ","マテル","レゴ","タカラトミー"],expl:"マテル社がバービー人形を1959年に発売しました。"},
+    {q:"「NARUTO」の主人公のフルネームは？",a:2,opts:["うちはサスケ","日向ヒナタ","うずまきナルト","春野サクラ"],expl:"うずまきナルトは「NARUTO-ナルト-」の主人公です。"},
+    {q:"映画「アラジン」でアラジンのお供の猿の名前は？",a:0,opts:["アブー","ジャスミン","イアーゴ","ラジャー"],expl:"アラジンの相棒の猿はアブーです。ジャスミンはヒロイン、イアーゴはオウムです。"},
+    {q:"「FF（ファイナルファンタジー）」を開発したゲーム会社は？",a:3,opts:["カプコン","セガ","バンダイナムコ","スクウェア（現スクウェア・エニックス）"],expl:"坂口博信が1987年にスクウェアでFF初作を開発しました。"},
+    {q:"「シンデレラ」でシンデレラが乗った馬車は何から作られた？",a:1,opts:["スイカ","カボチャ","リンゴ","大根"],expl:"魔法使いがカボチャを馬車に変え、シンデレラを舞踏会へ送り届けました。"},
+    {q:"映画「アベンジャーズ」でアイアンマンを演じた俳優は？",a:2,opts:["クリス・エヴァンス","クリス・ヘムズワース","ロバート・ダウニー・Jr.","マーク・ラファロ"],expl:"ロバート・ダウニー・Jr.は2008年のアイアンマンから同役を演じ続けました。"},
+  ]
+};
+
+let currentGenre = 'all';
+let currentQ = null;
+let answered = false;
+let shuffledPool = [];
+let poolIndex = 0;
+let stats = {correct:0, wrong:0, streak:0};
+
+function setGenre(g){
+  currentGenre = g;
+  ['all','science','history','geo','ent'].forEach(id=>{
+    const el = document.getElementById('g'+id.charAt(0).toUpperCase()+id.slice(1));
+    if(el) el.style.opacity = id===g ? '1' : '0.5';
+  });
+  rebuildPool();
+  nextQuestion();
+}
+
+function rebuildPool(){
+  const all = [];
+  if(currentGenre==='all'){
+    for(const g of Object.keys(QUESTIONS)) all.push(...QUESTIONS[g].map(q=>({...q,genre:g})));
+  } else {
+    all.push(...QUESTIONS[currentGenre].map(q=>({...q,genre:currentGenre})));
+  }
+  // shuffle
+  for(let i=all.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[all[i],all[j]]=[all[j],all[i]];}
+  shuffledPool = all;
+  poolIndex = 0;
+}
+
+function nextQuestion(){
+  if(shuffledPool.length===0) rebuildPool();
+  if(poolIndex >= shuffledPool.length){ rebuildPool(); }
+  currentQ = shuffledPool[poolIndex++];
+  answered = false;
+  renderQuestion();
+}
+
+const genreNames = {science:'🔬 科学', history:'📜 歴史', geo:'🌏 地理', ent:'🎭 エンタメ'};
+const genreColors = {science:'text-blue-300 bg-blue-900', history:'text-orange-300 bg-orange-900', geo:'text-green-300 bg-green-900', ent:'text-pink-300 bg-pink-900'};
+
+function renderQuestion(){
+  const qCard = document.getElementById('quizCard');
+  qCard.className='bg-gray-800 bg-opacity-80 rounded-2xl p-6 mb-4 fade-in';
+  void qCard.offsetWidth;
+  document.getElementById('genreTag').textContent = genreNames[currentQ.genre]||currentQ.genre;
+  document.getElementById('genreTag').className='text-xs px-2 py-0.5 rounded-full font-bold '+(genreColors[currentQ.genre]||'text-gray-300 bg-gray-700');
+  document.getElementById('qNumber').textContent = `Q.${poolIndex}`;
+  document.getElementById('question').textContent = currentQ.q;
+
+  // Shuffle options
+  const opts = currentQ.opts.map((o,i)=>({text:o,origIdx:i}));
+  for(let i=opts.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[opts[i],opts[j]]=[opts[j],opts[i]];}
+  const correctText = currentQ.opts[currentQ.a];
+
+  const optDiv = document.getElementById('options');
+  optDiv.innerHTML='';
+  opts.forEach((opt,si)=>{
+    const btn = document.createElement('button');
+    btn.className='option-btn w-full text-left px-4 py-3 rounded-xl border-2 border-gray-600 bg-gray-700 hover:bg-gray-600 text-white font-medium';
+    btn.textContent = `${String.fromCharCode(65+si)}. ${opt.text}`;
+    btn.setAttribute('aria-label', opt.text);
+    btn.onclick = ()=>answerQuestion(btn, opt.text, correctText);
+    optDiv.appendChild(btn);
+  });
+
+  document.getElementById('explanation').classList.add('hidden');
+  document.getElementById('btnNext').classList.add('hidden');
+  updateProgress();
+}
+
+function answerQuestion(btn, selected, correct){
+  if(answered) return;
+  answered = true;
+  const isCorrect = selected === correct;
+  if(isCorrect){ stats.correct++; stats.streak++; }
+  else { stats.wrong++; stats.streak=0; }
+  updateStats();
+
+  document.querySelectorAll('.option-btn').forEach(b=>{
+    if(b.textContent.slice(3) === correct) b.classList.add('correct');
+    b.disabled = true;
+  });
+  if(!isCorrect) btn.classList.add('wrong');
+
+  document.getElementById('explText').textContent = currentQ.expl;
+  document.getElementById('explanation').classList.remove('hidden');
+  document.getElementById('btnNext').classList.remove('hidden');
+  saveStats();
+}
+
+function updateStats(){
+  document.getElementById('statCorrect').textContent=stats.correct;
+  document.getElementById('statWrong').textContent=stats.wrong;
+  const total=stats.correct+stats.wrong||1;
+  document.getElementById('statRate').textContent=Math.round(stats.correct/total*100)+'%';
+  document.getElementById('statStreak').textContent=stats.streak;
+}
+
+function updateProgress(){
+  const total = shuffledPool.length;
+  const pct = Math.min(poolIndex/total*100,100);
+  document.getElementById('progressBar').style.width=pct+'%';
+  document.getElementById('progressText').textContent=`${poolIndex} / ${total} 問`;
+}
+
+function saveStats(){
+  try{ localStorage.setItem('trivia_stats', JSON.stringify(stats)); }catch(e){}
+}
+function loadStats(){
+  try{
+    const s=JSON.parse(localStorage.getItem('trivia_stats')||'{}');
+    stats.correct=s.correct||0; stats.wrong=s.wrong||0; stats.streak=s.streak||0;
+    updateStats();
+  }catch(e){}
+}
+
+loadStats();
+setGenre('all');
+</script>
+</body>
+</html>
